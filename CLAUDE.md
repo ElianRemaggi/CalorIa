@@ -64,3 +64,68 @@ Phases A→H defined in `10-roadmap-y-criterios.md`:
 - Frontend TypeScript types must stay consistent with API contracts
 - Write explicit SQL for all Flyway migrations
 - Integration tests should use Testcontainers against a real PostgreSQL instance
+
+## Workflow Rules
+
+### 1. Planning Mode by Default
+
+Enter planning mode for **any non-trivial task** (more than 3 steps or architectural decisions).
+
+- If something goes wrong, **STOP and replan immediately** — do not keep forcing it
+- Use planning mode for verification, not just for building
+- Write detailed specs upfront to reduce ambiguity
+
+### 2. Subagent Strategy
+
+Use subagents frequently to keep the main context window clean.
+
+- Delegate research, exploration, and parallel analysis to subagents
+- For complex problems, dedicate more compute via subagents
+- One task per subagent for focused execution
+
+### 3. Self-Improvement Loop
+
+After any user correction, **update `tasks/lessons.md`** with the pattern.
+
+- Write rules for yourself that prevent the same mistake
+- Iterate relentlessly on these lessons until error rate decreases
+- Review lessons at session start for the corresponding project
+
+### 4. Verify Before Finalizing
+
+Never mark a task as complete without demonstrating it works.
+
+- Compare behavior diff between main branch and your changes when relevant
+- Ask: *"Would a Staff Engineer approve this?"*
+- Run tests, check logs, and demonstrate code correctness
+
+### 5. Demand Elegance (Balanced)
+
+For non-trivial changes: pause and ask *"is there a more elegant way?"*
+
+- If a fix feels hacky: **knowing everything I know now, implement the elegant solution**
+- Skip this for simple, obvious fixes; do not over-engineer
+- Question your own work before presenting it
+
+### 6. Autonomous Error Correction
+
+When receiving a bug report: just fix it. Do not ask for hand-holding.
+
+- Identify logs, errors, or failing tests and then resolve them
+- Zero need for context switching from the user
+- Go fix failing CI tests without being told how
+
+### Task Management
+
+1. **Plan First**: Write the plan in `tasks/todo.md` with verifiable items
+2. **Verify Plan**: Confirm before starting implementation
+3. **Track Progress**: Mark items as completed as you go
+4. **Explain Changes**: High-level summary at each step
+5. **Document Results**: Add a review section to `tasks/todo.md`
+6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
+
+### Core Principles
+
+- **Simplicity First**: Make each change as simple as possible. Affect the minimum necessary code.
+- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
+- **Minimal Impact**: Changes should only touch what is necessary. Avoid introducing bugs.
