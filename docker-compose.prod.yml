@@ -1,0 +1,39 @@
+# Production docker-compose — VM deployment with Supabase as external DB
+# Usage:
+#   1. Copy .env.prod.example to .env.prod and fill in real values
+#   2. docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#   3. Nginx proxies https://api.caloria.com → http://127.0.0.1:8080
+
+services:
+  caloria-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: caloria-backend
+    restart: unless-stopped
+
+    # Only accessible from localhost — nginx handles TLS + public traffic
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q 'UP' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

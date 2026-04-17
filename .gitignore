@@ -18,10 +18,11 @@ mobile/ios/
 *.orig.*
 web-build/
 
-# Env files (keep .env.example committed, ignore actual secrets)
+# Env files (keep *.example committed, ignore actual secrets)
 .env
 .env.local
 .env.*.local
+.env.prod
 backend/.env
 mobile/.env.local
 mobile/.env.production.local
