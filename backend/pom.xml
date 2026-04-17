@@ -85,6 +85,12 @@
             <version>${google-api-client.version}</version>
         </dependency>
 
+        <!-- Actuator (health check, metrics) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- OpenAPI / Swagger -->
         <dependency>
             <groupId>org.springdoc</groupId>

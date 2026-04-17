@@ -1,0 +1,33 @@
+# Production profile — activated via SPRING_PROFILES_ACTIVE=prod
+spring:
+  jpa:
+    show-sql: false
+
+  # Disable Swagger UI in production
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# Expose only health endpoint publicly
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+  server:
+    # Keep actuator on same port (simpler for Railway/Render single-port deploys)
+    port: 8080
+
+logging:
+  level:
+    com.caloria: INFO
+    org.springframework.security: WARN
+    org.hibernate: WARN
+  pattern:
+    # Structured JSON logging for production log aggregators
+    console: '{"timestamp":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%p","logger":"%logger{36}","message":"%msg"}%n'

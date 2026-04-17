@@ -1,0 +1,19 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "backend/Dockerfile"
+buildCommand = ""
+
+[deploy]
+healthcheckPath = "/actuator/health"
+healthcheckTimeout = 90
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Railway injects PORT automatically; Spring Boot reads SERVER_PORT
+# Set these in Railway dashboard → Variables:
+#   SPRING_PROFILES_ACTIVE = prod
+#   DATABASE_URL            = jdbc:postgresql://...?sslmode=require
+#   DATABASE_USERNAME       = ...
+#   DATABASE_PASSWORD       = ...
+#   JWT_SECRET              = (generate: openssl rand -base64 64)
+#   GOOGLE_CLIENT_ID        = ...

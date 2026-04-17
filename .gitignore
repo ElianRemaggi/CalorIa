@@ -18,11 +18,18 @@ mobile/ios/
 *.orig.*
 web-build/
 
-# Env files
+# Env files (keep .env.example committed, ignore actual secrets)
 .env
 .env.local
 .env.*.local
 backend/.env
+mobile/.env.local
+mobile/.env.production.local
+
+# Google Services (contain API keys — add real files via EAS Secrets or CI)
+mobile/google-services.json
+mobile/GoogleService-Info.plist
+mobile/google-services-key.json
 
 # Java / Maven
 backend/target/
