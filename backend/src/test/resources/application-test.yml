@@ -1,0 +1,20 @@
+spring:
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+app:
+  jwt:
+    secret: integration-test-secret-key-padded-to-256-bits-long-abcde12345
+    expiration-ms: 3600000
+  google:
+    client-id: your-google-client-id.apps.googleusercontent.com
+
+logging:
+  level:
+    com.caloria: DEBUG
+    org.testcontainers: INFO
+    org.flywaydb: INFO

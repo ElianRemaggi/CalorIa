@@ -88,11 +88,19 @@ export default function SettingsScreen() {
         {/* User info */}
         <Section title="Cuenta">
           <View style={styles.userRow}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.userName}>{user?.fullName}</Text>
               <Text style={styles.userEmail}>{user?.email}</Text>
             </View>
           </View>
+          <TouchableOpacity style={styles.navRow} onPress={() => router.push('/profile')}>
+            <Text style={styles.navLabel}>Editar perfil nutricional</Text>
+            <Text style={styles.navArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.navRow} onPress={() => router.push('/weight')}>
+            <Text style={styles.navLabel}>Historial de peso</Text>
+            <Text style={styles.navArrow}>›</Text>
+          </TouchableOpacity>
         </Section>
 
         {/* AI Provider */}
@@ -225,4 +233,7 @@ const styles = StyleSheet.create({
   toggleLabel: { fontSize: 15, color: '#333' },
   logoutBtn: { margin: 20, padding: 16, backgroundColor: '#FFF', borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#F44336' },
   logoutText: { color: '#F44336', fontWeight: '700', fontSize: 16 },
+  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
+  navLabel: { fontSize: 15, color: '#333' },
+  navArrow: { fontSize: 20, color: '#CCC', fontWeight: '300' },
 });
