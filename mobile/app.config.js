@@ -1,0 +1,66 @@
+/** @type {import('expo/config').ExpoConfig} */
+const config = {
+  name: "CalorIA",
+  slug: "caloria",
+  version: "1.0.0",
+  orientation: "portrait",
+  scheme: "caloria",
+  userInterfaceStyle: "light",
+  icon: "./assets/icon.png",
+  splash: {
+    image: "./assets/splash.png",
+    resizeMode: "contain",
+    backgroundColor: "#4CAF50"
+  },
+  android: {
+    package: "com.caloria.app",
+    versionCode: 1,
+    adaptiveIcon: {
+      foregroundImage: "./assets/adaptive-icon.png",
+      backgroundColor: "#4CAF50"
+    },
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json"
+  },
+  ios: {
+    bundleIdentifier: "com.caloria.app",
+    buildNumber: "1",
+    supportsTablet: false,
+    infoPlist: {
+      NSCameraUsageDescription: "CalorIA necesita acceso a la cámara para fotografiar tus comidas.",
+      NSPhotoLibraryUsageDescription: "CalorIA necesita acceso a tus fotos para registrar comidas."
+    }
+  },
+  plugins: [
+    "expo-router",
+    "expo-secure-store",
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "La app necesita acceso a tus fotos para registrar comidas.",
+        cameraPermission: "La app necesita acceso a la cámara para tomar fotos de tus comidas."
+      }
+    ],
+    [
+      "expo-notifications",
+      {
+        sounds: []
+      }
+    ],
+    [
+      "@react-native-google-signin/google-signin",
+      {
+        iosUrlScheme: "com.googleusercontent.apps.placeholder"
+      }
+    ]
+  ],
+  experiments: {
+    typedRoutes: true
+  },
+  extra: {
+    eas: {
+      projectId: "d9c6249a-4ccd-430b-ba0b-01c540151351"
+    }
+  }
+};
+
+module.exports = config;

@@ -20,7 +20,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://your-staging-app.up.railway.app/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://caloria.drinklen.com.ar/api/v1",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "953783966762-5bnejkabgh7a4knrp1l37doa3v7p995l.apps.googleusercontent.com"
       }
     },
     "production": {
@@ -28,7 +29,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://your-production-app.up.railway.app/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://caloria.drinklen.com.ar/api/v1",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "953783966762-5bnejkabgh7a4knrp1l37doa3v7p995l.apps.googleusercontent.com"
       }
     }
   },
