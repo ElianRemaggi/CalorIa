@@ -124,6 +124,7 @@ Request:
   "finalCarbsG": 66,
   "finalFatG": 17,
   "aiProvider": "openai",
+  "usdaFdcId": "171477",
   "aiDebug": {
     "promptText": "....",
     "rawResponse": "{...}",
@@ -182,12 +183,42 @@ Devuelve historial de peso.
 }
 ```
 
-## 9. Usuario
+## 9. USDA FoodData Central
+
+### GET /api/v1/usda/search
+Busca alimentos en la base de datos USDA FoodData Central. Requiere auth.
+
+Parámetros:
+- `query` (string, requerido): nombre del alimento a buscar
+- `pageSize` (int, opcional, default 5, max 10): cantidad de resultados
+
+Response:
+```json
+{
+  "foods": [
+    {
+      "fdcId": "171477",
+      "description": "Chicken, broilers or fryers, breast, meat only, cooked, roasted",
+      "calories": 165,
+      "proteinG": 31,
+      "carbsG": 0,
+      "fatG": 4
+    }
+  ]
+}
+```
+
+Notas:
+- Los valores nutricionales son por 100g
+- Si USDA no responde o da error, retorna `{ "foods": [] }` (falla silenciosa, no bloquea el flujo)
+- La API key se configura con la variable de entorno `USDA_API_KEY`. Sin ella usa `DEMO_KEY` (30 req/hora/IP)
+
+## 10. Usuario
 
 ### GET /api/v1/users/me
 Devuelve datos básicos del usuario autenticado.
 
-## 10. Errores estándar
+## 11. Errores estándar
 ```json
 {
   "timestamp": "2026-03-16T12:00:00Z",

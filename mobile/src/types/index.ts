@@ -58,6 +58,7 @@ export interface MealEntry {
   finalCarbsG: number;
   finalFatG: number;
   aiProvider?: string;
+  usdaFdcId?: string;
   createdAt: string;
 }
 
@@ -77,11 +78,25 @@ export interface PhotoMealPayload extends ManualMealPayload {
   estimatedCarbsG: number;
   estimatedFatG: number;
   aiProvider: string;
+  usdaFdcId?: string;
   aiDebug: {
     promptText: string;
     rawResponse: string;
     parsedResponse: object;
   };
+}
+
+export interface UsdaFoodItem {
+  fdcId: string;
+  description: string;
+  calories: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+}
+
+export interface UsdaSearchResponse {
+  foods: UsdaFoodItem[];
 }
 
 export interface AIAnalysisResult {

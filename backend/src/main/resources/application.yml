@@ -34,6 +34,9 @@ app:
   google:
     client-id: ${GOOGLE_CLIENT_ID:your-google-client-id.apps.googleusercontent.com}
 
+usda:
+  api-key: ${USDA_API_KEY:DEMO_KEY}
+
 springdoc:
   api-docs:
     path: /v3/api-docs

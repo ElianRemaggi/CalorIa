@@ -17,5 +17,6 @@ public record PhotoMealRequest(
         @NotNull @Min(0) @Max(1000) Integer finalCarbsG,
         @NotNull @Min(0) @Max(1000) Integer finalFatG,
         @NotBlank String aiProvider,
-        AiDebugInfo aiDebug
+        AiDebugInfo aiDebug,
+        String usdaFdcId
 ) {}

@@ -67,6 +67,7 @@ public class MealService {
                 .finalCarbsG(request.finalCarbsG())
                 .finalFatG(request.finalFatG())
                 .aiProvider(request.aiProvider())
+                .usdaFdcId(request.usdaFdcId())
                 .build();
 
         MealEntry saved = mealEntryRepository.save(meal);

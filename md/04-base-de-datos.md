@@ -79,6 +79,7 @@ create table meal_entry (
   final_carbs_g integer not null,
   final_fat_g integer not null,
   ai_provider varchar(32),
+  usda_fdc_id varchar(20),          -- ID de USDA FoodData Central (opcional, V8)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -187,6 +188,7 @@ src/main/resources/db/migration/
   V5__create_meal_ai_response.sql
   V6__create_weight_log.sql
   V7__create_notification_settings.sql
+  V8__add_usda_fdc_id_to_meal_entry.sql
 ```
 
 ## 9. Reglas de integridad

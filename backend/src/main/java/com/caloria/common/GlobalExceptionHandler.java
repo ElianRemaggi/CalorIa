@@ -4,11 +4,13 @@ import com.caloria.common.exception.AuthException;
 import com.caloria.common.exception.ConflictException;
 import com.caloria.common.exception.EntityNotFoundException;
 import com.caloria.common.exception.ForbiddenException;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -26,6 +28,27 @@ public class GlobalExceptionHandler {
                 .map(f -> new ErrorResponse.FieldError(f.getField(), f.getDefaultMessage()))
                 .toList();
         return ErrorResponse.of(400, "VALIDATION_ERROR", "Invalid request", errors);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMissingParam(MissingServletRequestParameterException ex) {
+        return ErrorResponse.of(400, "VALIDATION_ERROR",
+                "Required parameter '" + ex.getParameterName() + "' is missing");
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleConstraintViolation(ConstraintViolationException ex) {
+        List<ErrorResponse.FieldError> errors = ex.getConstraintViolations().stream()
+                .map(v -> {
+                    String path = v.getPropertyPath().toString();
+                    // strip the method name prefix (e.g. "search.pageSize" → "pageSize")
+                    String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+                    return new ErrorResponse.FieldError(field, v.getMessage());
+                })
+                .toList();
+        return ErrorResponse.of(400, "VALIDATION_ERROR", "Invalid request parameters", errors);
     }
 
     @ExceptionHandler(EntityNotFoundException.class)

@@ -21,8 +21,9 @@ Soportar múltiples proveedores de IA en el frontend usando API key local del us
 3. usuario toma o elige foto
 4. app llama al proveedor IA
 5. proveedor devuelve resultado JSON
-6. app muestra preview editable
-7. app envía al backend el resultado final confirmado
+6. app muestra preview editable **y simultáneamente busca el título en USDA (ver sección 13)**
+7. usuario puede elegir valores de IA o valores de USDA
+8. app envía al backend el resultado final confirmado (con `usdaFdcId` si el usuario eligió USDA)
 
 ## 5. Contrato lógico esperado de IA
 La respuesta debe incluir:
@@ -133,3 +134,37 @@ No enviar:
 - preview editable visible antes de guardar
 - parse robusto con fallback
 - backend recibe estructura uniforme independientemente del proveedor
+
+## 13. Integración USDA FoodData Central
+
+### Motivación
+La IA estima macros "a ciegas" a partir de una imagen. USDA FoodData Central es una base de datos nutricional oficial del USDA que permite cruzar esa estimación con datos reales por alimento.
+
+### Arquitectura
+- La búsqueda corre en el **backend** (proxy): `GET /api/v1/usda/search?query=...`
+- La API key USDA vive en el servidor como `USDA_API_KEY` (nunca en el cliente)
+- Sin clave configurada, usa `DEMO_KEY` (gratis, limitada a 30 req/hora/IP)
+- USDA API base URL: `https://api.nal.usda.gov/fdc/v1`
+
+### Flujo en el frontend
+1. Análisis IA completa → modal de confirmación se abre inmediatamente
+2. En paralelo (sin bloquear): `GET /api/v1/usda/search?query={título del plato}`
+3. Si USDA retorna resultados, aparece sección de comparación en el modal
+4. El usuario puede tocar un item USDA → el formulario se pre-llena con esos macros
+5. El usuario puede volver a valores IA con "Volver a valores IA"
+6. Al guardar: si eligió USDA, el `fdcId` se envía en el campo `usdaFdcId` de `POST /meals/photo`
+
+### Comportamiento ante fallos
+- Si USDA falla (timeout, error de red, 4xx/5xx): retorna lista vacía, no muestra sección USDA, no bloquea el guardado
+- El campo `usda_fdc_id` en `meal_entry` es siempre opcional
+
+### Valores nutricionales USDA
+Los valores son **por 100g**. El usuario debe considerar esto al elegir (si la porción real difiere de 100g, puede editar los valores antes de confirmar).
+
+### Nutrient IDs usados
+| Nutriente | ID USDA |
+|---|---|
+| Energía (kcal) | 1008 |
+| Proteínas (g) | 1003 |
+| Carbohidratos (g) | 1005 |
+| Grasas totales (g) | 1004 |

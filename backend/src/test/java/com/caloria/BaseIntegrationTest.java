@@ -2,7 +2,6 @@ package com.caloria;
 
 import com.caloria.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,28 +12,30 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Base64;
-import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-@Testcontainers
 @ActiveProfiles("test")
 @Sql(scripts = "/truncate.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 public abstract class BaseIntegrationTest {
 
-    @Container
-    static PostgreSQLContainer<?> postgres =
-        new PostgreSQLContainer<>("postgres:15-alpine")
-            .withDatabaseName("caloria_test")
-            .withUsername("caloria")
-            .withPassword("caloria");
+    // Single container shared across all test classes — prevents context cache
+    // mismatches that occur when @Testcontainers restarts the container between
+    // classes while Spring reuses the cached context pointing to the old port.
+    static final PostgreSQLContainer<?> postgres;
+
+    static {
+        postgres = new PostgreSQLContainer<>("postgres:15-alpine")
+                .withDatabaseName("caloria_test")
+                .withUsername("caloria")
+                .withPassword("caloria");
+        postgres.start();
+    }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -52,10 +53,6 @@ public abstract class BaseIntegrationTest {
     @Autowired
     protected JwtService jwtService;
 
-    /**
-     * Creates a user via the real auth endpoint (using dev-mode token) and returns the JWT.
-     * This creates a real DB row so foreign key constraints are satisfied.
-     */
     protected String authenticateAndGetToken(String googleId, String email) throws Exception {
         String devToken = buildDevToken(googleId, email, "Test User");
         String body = """
@@ -70,14 +67,9 @@ public abstract class BaseIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-        // Extract "accessToken" field from JSON response
         return objectMapper.readTree(response).get("accessToken").asText();
     }
 
-    /**
-     * Builds a fake JWT-shaped dev token that AuthService.parseTokenLeniently() can decode.
-     * Format: eyJ.<base64url-payload>.sig
-     */
     private String buildDevToken(String googleId, String email, String name) {
         String payload = """
             {"sub":"%s","email":"%s","name":"%s"}

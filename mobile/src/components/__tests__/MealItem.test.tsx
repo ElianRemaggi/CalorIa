@@ -78,7 +78,7 @@ describe('MealItem', () => {
     const onDelete = jest.fn();
     let destructiveCallback: (() => void) | undefined;
 
-    jest.spyOn(Alert, 'alert').mockImplementation((_title, _msg, buttons) => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_title: string, _msg: string, buttons: any) => {
       destructiveCallback = (buttons as { style: string; onPress?: () => void }[])
         .find((b) => b.style === 'destructive')?.onPress;
     });

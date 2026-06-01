@@ -22,7 +22,7 @@ export default function LoginScreen() {
     try {
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken;
+      const idToken = userInfo.idToken;
       if (!idToken) throw new Error('No se obtuvo el token de Google');
 
       const authResponse = await googleAuth(idToken);

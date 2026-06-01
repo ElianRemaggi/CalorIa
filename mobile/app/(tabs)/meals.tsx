@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Modal,
   TextInput, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
@@ -15,7 +15,8 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { analyzeImage } from '@/services/ai';
 import { useSettingsStore } from '@/store/settingsStore';
-import { AIAnalysisResult } from '@/types';
+import { AIAnalysisResult, UsdaFoodItem } from '@/types';
+import { searchUsda } from '@/api/usda';
 import { format } from 'date-fns';
 
 const manualSchema = z.object({
@@ -39,6 +40,9 @@ export default function MealsScreen() {
   const [showManualModal, setShowManualModal] = useState(false);
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
+  const [usdaResults, setUsdaResults] = useState<UsdaFoodItem[]>([]);
+  const [selectedUsdaItem, setSelectedUsdaItem] = useState<UsdaFoodItem | null>(null);
+  const [searchingUsda, setSearchingUsda] = useState(false);
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm<ManualForm>({
     resolver: zodResolver(manualSchema),
@@ -76,8 +80,15 @@ export default function MealsScreen() {
       });
       const analysis = await analyzeImage(base64, aiProvider);
       setAiResult(analysis);
-    } catch (error: any) {
-      Alert.alert('Error al analizar', error.message, [
+      // Fire USDA search in background — don't block modal
+      setSearchingUsda(true);
+      searchUsda(analysis.title)
+        .then((res) => setUsdaResults(res.foods))
+        .catch(() => setUsdaResults([]))
+        .finally(() => setSearchingUsda(false));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      Alert.alert('Error al analizar', message, [
         { text: 'Cargar manualmente', onPress: () => setShowManualModal(true) },
         { text: 'Cancelar', style: 'cancel' },
       ]);
@@ -101,6 +112,7 @@ export default function MealsScreen() {
       finalCarbsG: final.finalCarbsG,
       finalFatG: final.finalFatG,
       aiProvider: aiResult.provider,
+      usdaFdcId: selectedUsdaItem?.fdcId,
       aiDebug: {
         promptText: aiResult.promptText,
         rawResponse: aiResult.rawResponse,
@@ -115,6 +127,8 @@ export default function MealsScreen() {
       },
     });
     setAiResult(null);
+    setUsdaResults([]);
+    setSelectedUsdaItem(null);
     reset();
   };
 
@@ -156,7 +170,7 @@ export default function MealsScreen() {
           <Text style={styles.btnSecondaryText}>+ Manual</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.btnPrimary} onPress={handlePickPhoto}>
-          <Text style={styles.btnPrimaryText}>📷 Por foto</Text>
+          <Text style={styles.btnPrimaryText}>Por foto</Text>
         </TouchableOpacity>
       </View>
 
@@ -201,15 +215,76 @@ export default function MealsScreen() {
               <Text style={styles.modalTitle}>Resultado IA</Text>
               <Text style={styles.aiProvider}>Proveedor: {aiResult.provider}</Text>
               {aiResult.warnings?.map((w, i) => (
-                <Text key={i} style={styles.warning}>⚠️ {w}</Text>
+                <Text key={i} style={styles.warning}>{w}</Text>
               ))}
               <Text style={styles.aiHint}>Revisá y corregí los valores antes de guardar</Text>
+
+              {/* USDA comparison */}
+              {searchingUsda && (
+                <View style={[styles.usdaSection, { flexDirection: 'row', alignItems: 'center' }]}>
+                  <ActivityIndicator size="small" color="#4CAF50" />
+                  <Text style={styles.usdaLabel}>Buscando en base USDA...</Text>
+                </View>
+              )}
+              {!searchingUsda && usdaResults.length > 0 && (
+                <View style={styles.usdaSection}>
+                  <Text style={styles.usdaSectionTitle}>Coincidencias USDA (por 100g)</Text>
+                  {usdaResults.slice(0, 3).map((item) => {
+                    const isSelected = selectedUsdaItem?.fdcId === item.fdcId;
+                    return (
+                      <TouchableOpacity
+                        key={item.fdcId}
+                        style={[styles.usdaItem, isSelected && styles.usdaItemSelected]}
+                        onPress={() => {
+                          if (isSelected) {
+                            setSelectedUsdaItem(null);
+                          } else {
+                            setSelectedUsdaItem(item);
+                            // Pre-fill form with USDA values
+                            reset({
+                              title: aiResult.title,
+                              description: aiResult.description ?? '',
+                              finalCalories: item.calories ?? aiResult.estimatedCalories,
+                              finalProteinG: item.proteinG ?? aiResult.estimatedProteinG,
+                              finalCarbsG: item.carbsG ?? aiResult.estimatedCarbsG,
+                              finalFatG: item.fatG ?? aiResult.estimatedFatG,
+                            });
+                          }
+                        }}
+                      >
+                        <Text style={styles.usdaItemName} numberOfLines={1}>{item.description}</Text>
+                        <Text style={styles.usdaItemMacros}>
+                          {item.calories ?? '?'} kcal · P {item.proteinG ?? '?'}g · C {item.carbsG ?? '?'}g · G {item.fatG ?? '?'}g
+                        </Text>
+                        {isSelected && <Text style={styles.usdaItemBadge}>Seleccionado</Text>}
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {selectedUsdaItem && (
+                    <TouchableOpacity onPress={() => {
+                      setSelectedUsdaItem(null);
+                      reset({
+                        title: aiResult.title,
+                        description: aiResult.description ?? '',
+                        finalCalories: aiResult.estimatedCalories,
+                        finalProteinG: aiResult.estimatedProteinG,
+                        finalCarbsG: aiResult.estimatedCarbsG,
+                        finalFatG: aiResult.estimatedFatG,
+                      });
+                    }}>
+                      <Text style={styles.usdaReset}>Volver a valores IA</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
               <AIResultForm
                 aiResult={aiResult}
                 control={control}
                 errors={errors}
+                reset={reset}
                 onConfirm={handleSubmit(handleConfirmAI)}
-                onCancel={() => { setAiResult(null); reset(); }}
+                onCancel={() => { setAiResult(null); setUsdaResults([]); setSelectedUsdaItem(null); reset(); }}
                 isPending={createPhoto.isPending}
               />
             </ScrollView>
@@ -256,20 +331,20 @@ const AIResultForm: React.FC<{
   aiResult: AIAnalysisResult;
   control: any;
   errors: any;
+  reset: (values: ManualForm) => void;
   onConfirm: () => void;
   onCancel: () => void;
   isPending: boolean;
-}> = ({ aiResult, control, errors, onConfirm, onCancel, isPending }) => {
-  // Pre-fill form with AI values
-  React.useEffect(() => {
-    control._defaultValues = {
+}> = ({ aiResult, control, errors, reset, onConfirm, onCancel, isPending }) => {
+  useEffect(() => {
+    reset({
       title: aiResult.title,
-      description: aiResult.description,
+      description: aiResult.description ?? '',
       finalCalories: aiResult.estimatedCalories,
       finalProteinG: aiResult.estimatedProteinG,
       finalCarbsG: aiResult.estimatedCarbsG,
       finalFatG: aiResult.estimatedFatG,
-    };
+    });
   }, []);
 
   return (
@@ -346,4 +421,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnCancelText: { color: '#666', fontWeight: '600' },
+  usdaSection: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  usdaLabel: { color: '#555', fontSize: 13, marginLeft: 8 },
+  usdaSectionTitle: { fontSize: 14, fontWeight: '700', color: '#2E7D32', marginBottom: 4 },
+  usdaItem: {
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1.5,
+    borderColor: '#C8E6C9',
+  },
+  usdaItemSelected: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#F1F8E9',
+  },
+  usdaItemName: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
+  usdaItemMacros: { fontSize: 12, color: '#666', marginTop: 2 },
+  usdaItemBadge: { fontSize: 11, color: '#4CAF50', fontWeight: '700', marginTop: 4 },
+  usdaReset: { fontSize: 12, color: '#F57C00', textAlign: 'center', marginTop: 4, textDecorationLine: 'underline' },
 });

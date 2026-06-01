@@ -129,7 +129,7 @@ class MealServiceTest {
                 "Pizza", "slice", OffsetDateTime.now(ZoneOffset.UTC),
                 600, 20, 70, 25,
                 580, 19, 68, 24,
-                "openai", null);
+                "openai", null, null);
 
         MealResponse response = mealService.createFromPhoto(OWNER_ID, req);
 
@@ -147,7 +147,7 @@ class MealServiceTest {
                 "Salad", null, OffsetDateTime.now(ZoneOffset.UTC),
                 null, null, null, null,
                 300, 10, 40, 8,
-                "gemini", null);
+                "gemini", null, null);
 
         mealService.createFromPhoto(OWNER_ID, req);
 

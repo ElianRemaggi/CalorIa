@@ -20,6 +20,7 @@ public record MealResponse(
         int finalCarbsG,
         int finalFatG,
         String aiProvider,
+        String usdaFdcId,
         OffsetDateTime createdAt
 ) {
     public static MealResponse from(MealEntry m) {
@@ -28,7 +29,7 @@ public record MealResponse(
                 m.getMealDatetime(), m.getEstimatedCalories(), m.getEstimatedProteinG(),
                 m.getEstimatedCarbsG(), m.getEstimatedFatG(), m.getFinalCalories(),
                 m.getFinalProteinG(), m.getFinalCarbsG(), m.getFinalFatG(),
-                m.getAiProvider(), m.getCreatedAt()
+                m.getAiProvider(), m.getUsdaFdcId(), m.getCreatedAt()
         );
     }
 }

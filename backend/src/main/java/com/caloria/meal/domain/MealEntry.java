@@ -63,6 +63,9 @@ public class MealEntry {
     @Column(name = "ai_provider", length = 32)
     private String aiProvider;
 
+    @Column(name = "usda_fdc_id", length = 20)
+    private String usdaFdcId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
