@@ -11,7 +11,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:8080/api/v1"
+        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:8080/api/v1",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "953783966762-2pggjqansnu6k1kfsliui4o5ahl24u0j.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -21,7 +22,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://caloria.drinklen.com.ar/api/v1",
-        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "953783966762-5bnejkabgh7a4knrp1l37doa3v7p995l.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "953783966762-2pggjqansnu6k1kfsliui4o5ahl24u0j.apps.googleusercontent.com"
       }
     },
     "production": {
@@ -30,7 +31,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://caloria.drinklen.com.ar/api/v1",
-        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "953783966762-5bnejkabgh7a4knrp1l37doa3v7p995l.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "953783966762-2pggjqansnu6k1kfsliui4o5ahl24u0j.apps.googleusercontent.com"
       }
     }
   },
