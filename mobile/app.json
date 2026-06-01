@@ -19,7 +19,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#4CAF50"
       },
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "$GOOGLE_SERVICES_JSON"
     },
     "ios": {
       "bundleIdentifier": "com.caloria.app",
