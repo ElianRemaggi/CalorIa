@@ -4,7 +4,8 @@ import { parseAIJson } from './types';
 
 export const analyzeWithGemini = async (
   imageBase64: string,
-  apiKey: string
+  apiKey: string,
+  model: string = 'gemini-1.5-flash'
 ): Promise<AIAnalysisResult> => {
   const body = {
     contents: [
@@ -23,10 +24,11 @@ export const analyzeWithGemini = async (
     generationConfig: {
       maxOutputTokens: 1024,
       temperature: 0.2,
+      responseMimeType: 'application/json',
     },
   };
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
     method: 'POST',

@@ -2,19 +2,18 @@ import { AIAnalysisResult } from '@/types';
 import { AI_PROMPT } from './prompt';
 import { parseAIJson } from './types';
 
-export const analyzeWithOpenAI = async (
+export const analyzeWithDeepSeek = async (
   imageBase64: string,
   apiKey: string,
-  model: string = 'gpt-4o'
+  model: string = 'deepseek-chat'
 ): Promise<AIAnalysisResult> => {
   const body = {
     model,
     max_tokens: 1024,
-    response_format: { type: 'json_object' },
     messages: [
       {
         role: 'system',
-        content: 'Eres un analizador de comida. Responde siempre con un JSON válido siguiendo exactamente el formato indicado.',
+        content: 'Eres un analizador de comida. Responde siempre con un JSON válido siguiendo exactamente el formato indicado. No agregues texto antes ni después del JSON.',
       },
       {
         role: 'user',
@@ -32,7 +31,7 @@ export const analyzeWithOpenAI = async (
     ],
   };
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -43,7 +42,7 @@ export const analyzeWithOpenAI = async (
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`OpenAI error ${response.status}: ${error}`);
+    throw new Error(`DeepSeek error ${response.status}: ${error}`);
   }
 
   const json = await response.json();
@@ -52,7 +51,7 @@ export const analyzeWithOpenAI = async (
 
   return {
     ...parsed,
-    provider: 'openai',
+    provider: 'deepseek',
     rawResponse: rawContent,
     promptText: AI_PROMPT,
   };

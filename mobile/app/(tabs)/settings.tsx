@@ -10,6 +10,7 @@ import { getNotificationSettings, updateNotificationSettings } from '@/api/notif
 import { useAuthStore } from '@/store/authStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { getApiKey, saveApiKey } from '@/services/secureStorage';
+import { fetchModels, ModelOption } from '@/services/ai/modelFetcher';
 import { AIProvider, NotificationPreferences } from '@/types';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
@@ -17,19 +18,22 @@ const AI_PROVIDERS: { value: AIProvider; label: string }[] = [
   { value: 'openai', label: 'OpenAI (GPT-4o)' },
   { value: 'gemini', label: 'Google Gemini' },
   { value: 'claude', label: 'Anthropic Claude' },
+  { value: 'deepseek', label: 'DeepSeek' },
 ];
 
 export default function SettingsScreen() {
   const router = useRouter();
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const user = useAuthStore((s) => s.user);
-  const { aiProvider, setAiProvider } = useSettingsStore();
+  const { aiProvider, setAiProvider, selectedModels, setSelectedModel } = useSettingsStore();
   const queryClient = useQueryClient();
 
   const [apiKeys, setApiKeys] = useState<Record<AIProvider, string>>({
-    openai: '', gemini: '', claude: '',
+    openai: '', gemini: '', claude: '', deepseek: '',
   });
   const [savingKey, setSavingKey] = useState<AIProvider | null>(null);
+  const [verifying, setVerifying] = useState<AIProvider | null>(null);
+  const [availableModels, setAvailableModels] = useState<Partial<Record<AIProvider, ModelOption[]>>>({});
 
   const { data: notifSettings } = useQuery({
     queryKey: ['notification-settings'],
@@ -42,7 +46,7 @@ export default function SettingsScreen() {
   });
 
   useEffect(() => {
-    (['openai', 'gemini', 'claude'] as AIProvider[]).forEach(async (p) => {
+    (['openai', 'gemini', 'claude', 'deepseek'] as AIProvider[]).forEach(async (p) => {
       const key = await getApiKey(p);
       if (key) setApiKeys((prev) => ({ ...prev, [p]: key }));
     });
@@ -52,11 +56,33 @@ export default function SettingsScreen() {
     setSavingKey(provider);
     try {
       await saveApiKey(provider, apiKeys[provider]);
+      setAvailableModels((prev) => ({ ...prev, [provider]: undefined }));
       Alert.alert('Guardado', `API key de ${provider} guardada correctamente`);
     } catch {
       Alert.alert('Error', 'No se pudo guardar la API key');
     } finally {
       setSavingKey(null);
+    }
+  };
+
+  const handleVerifyModels = async (provider: AIProvider) => {
+    const key = apiKeys[provider];
+    if (!key) {
+      Alert.alert('Sin API key', 'Guardá la API key primero');
+      return;
+    }
+    setVerifying(provider);
+    try {
+      const models = await fetchModels(provider, key);
+      if (models.length === 0) {
+        Alert.alert('Sin modelos', 'No se encontraron modelos disponibles para esta key');
+        return;
+      }
+      setAvailableModels((prev) => ({ ...prev, [provider]: models }));
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'No se pudo obtener la lista de modelos');
+    } finally {
+      setVerifying(null);
     }
   };
 
@@ -111,9 +137,12 @@ export default function SettingsScreen() {
               style={[styles.providerRow, aiProvider === p.value && styles.providerSelected]}
               onPress={() => setAiProvider(p.value)}
             >
-              <Text style={[styles.providerLabel, aiProvider === p.value && styles.providerLabelSelected]}>
-                {p.label}
-              </Text>
+              <View>
+                <Text style={[styles.providerLabel, aiProvider === p.value && styles.providerLabelSelected]}>
+                  {p.label}
+                </Text>
+                <Text style={styles.modelSubtitle}>{selectedModels[p.value]}</Text>
+              </View>
               {aiProvider === p.value && <Text style={styles.checkmark}>✓</Text>}
             </TouchableOpacity>
           ))}
@@ -144,6 +173,43 @@ export default function SettingsScreen() {
                     : <Text style={styles.saveBtnText}>Guardar</Text>}
                 </TouchableOpacity>
               </View>
+
+              <TouchableOpacity
+                style={styles.verifyBtn}
+                onPress={() => handleVerifyModels(p.value)}
+                disabled={verifying === p.value || !apiKeys[p.value]}
+              >
+                {verifying === p.value
+                  ? <ActivityIndicator size="small" color="#1565C0" />
+                  : <Text style={[styles.verifyBtnText, !apiKeys[p.value] && styles.verifyBtnDisabled]}>
+                      Verificar modelos disponibles
+                    </Text>}
+              </TouchableOpacity>
+
+              {availableModels[p.value] && (
+                <View style={styles.modelList}>
+                  {availableModels[p.value]!.map((m) => (
+                    <TouchableOpacity
+                      key={m.id}
+                      style={[
+                        styles.modelChip,
+                        selectedModels[p.value] === m.id && styles.modelChipSelected,
+                      ]}
+                      onPress={() => setSelectedModel(p.value, m.id)}
+                    >
+                      <Text style={[
+                        styles.modelChipText,
+                        selectedModels[p.value] === m.id && styles.modelChipTextSelected,
+                      ]}>
+                        {m.displayName}
+                      </Text>
+                      {selectedModels[p.value] === m.id && (
+                        <Text style={styles.modelChipCheck}>✓</Text>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
           ))}
         </Section>
@@ -221,6 +287,7 @@ const styles = StyleSheet.create({
   providerSelected: { backgroundColor: '#F1F8E9' },
   providerLabel: { fontSize: 15, color: '#333' },
   providerLabelSelected: { color: '#4CAF50', fontWeight: '600' },
+  modelSubtitle: { fontSize: 11, color: '#AAA', marginTop: 2 },
   checkmark: { color: '#4CAF50', fontSize: 18, fontWeight: '700' },
   hint: { fontSize: 12, color: '#999', padding: 12, fontStyle: 'italic' },
   keyRow: { padding: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
@@ -229,6 +296,15 @@ const styles = StyleSheet.create({
   keyField: { flex: 1, backgroundColor: '#F5F5F5', borderWidth: 1, borderColor: '#DDD', borderRadius: 8, padding: 10, fontSize: 14 },
   saveBtn: { backgroundColor: '#4CAF50', borderRadius: 8, paddingHorizontal: 14, justifyContent: 'center' },
   saveBtnText: { color: '#FFF', fontWeight: '600', fontSize: 13 },
+  verifyBtn: { marginTop: 8, paddingVertical: 8, alignItems: 'center' },
+  verifyBtnText: { color: '#1565C0', fontSize: 13, fontWeight: '600' },
+  verifyBtnDisabled: { color: '#BBB' },
+  modelList: { marginTop: 10, gap: 6 },
+  modelChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#DDD', backgroundColor: '#FAFAFA' },
+  modelChipSelected: { borderColor: '#4CAF50', backgroundColor: '#F1F8E9' },
+  modelChipText: { fontSize: 13, color: '#444', flex: 1 },
+  modelChipTextSelected: { color: '#2E7D32', fontWeight: '600' },
+  modelChipCheck: { color: '#4CAF50', fontWeight: '700', marginLeft: 8 },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   toggleLabel: { fontSize: 15, color: '#333' },
   logoutBtn: { margin: 20, padding: 16, backgroundColor: '#FFF', borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#F44336' },

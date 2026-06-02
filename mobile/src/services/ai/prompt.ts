@@ -1,19 +1,21 @@
-export const AI_PROMPT = `Analiza la imagen de una comida y responde únicamente en formato JSON válido.
-Debes estimar el plato observado de forma aproximada, no clínica.
+export const AI_PROMPT = `Analiza la imagen de una comida y devuelve ÚNICAMENTE el siguiente JSON, sin texto adicional, sin markdown, sin bloques de código.
 
-Campos requeridos:
-- title: string (nombre del plato en español)
-- description: string breve en español describiendo ingredientes observados
-- estimatedCalories: integer
-- estimatedProteinG: integer
-- estimatedCarbsG: integer
-- estimatedFatG: integer
-- confidence: number entre 0 y 1
-- warnings: array de strings
+{
+  "title": "nombre del plato en español",
+  "description": "descripción breve de ingredientes observados",
+  "estimatedCalories": 450,
+  "estimatedProteinG": 25,
+  "estimatedCarbsG": 40,
+  "estimatedFatG": 15,
+  "confidence": 0.85,
+  "warnings": []
+}
 
 Reglas:
-- no agregues texto fuera del JSON
-- si no estás seguro, usa warnings
-- si la comida es ambigua, da la mejor estimación razonable
-- responde en español
-- devuelve SOLO el JSON, sin markdown, sin bloques de código`;
+- Responde SOLO con el JSON. Ninguna palabra antes ni después.
+- Todos los campos son obligatorios.
+- estimatedCalories, estimatedProteinG, estimatedCarbsG, estimatedFatG deben ser enteros.
+- confidence es un número entre 0 y 1.
+- warnings es un array de strings (vacío si no hay advertencias).
+- Si la imagen no es comida, igual devuelve el JSON con confidence: 0 y un warning explicando.
+- Todos los textos en español.`;

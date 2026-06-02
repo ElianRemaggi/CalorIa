@@ -122,7 +122,7 @@ export interface NotificationPreferences {
   maxNotificationsPerDay: number;
 }
 
-export type AIProvider = 'openai' | 'gemini' | 'claude';
+export type AIProvider = 'openai' | 'gemini' | 'claude' | 'deepseek';
 
 export interface DailySummary {
   date: string;

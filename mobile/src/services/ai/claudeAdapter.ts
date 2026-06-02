@@ -4,11 +4,13 @@ import { parseAIJson } from './types';
 
 export const analyzeWithClaude = async (
   imageBase64: string,
-  apiKey: string
+  apiKey: string,
+  model: string = 'claude-3-haiku-20240307'
 ): Promise<AIAnalysisResult> => {
   const body = {
-    model: 'claude-3-haiku-20240307',
+    model,
     max_tokens: 1024,
+    system: 'Eres un analizador de comida. Responde siempre con un JSON válido siguiendo exactamente el formato indicado. No agregues texto antes ni después del JSON.',
     messages: [
       {
         role: 'user',

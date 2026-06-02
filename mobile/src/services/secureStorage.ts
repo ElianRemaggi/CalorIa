@@ -22,3 +22,8 @@ export const saveAiProvider = (provider: AIProvider) =>
   SecureStore.setItemAsync(KEYS.AI_PROVIDER, provider);
 export const getAiProvider = () =>
   SecureStore.getItemAsync(KEYS.AI_PROVIDER) as Promise<AIProvider | null>;
+
+export const saveSelectedModel = (provider: AIProvider, model: string) =>
+  SecureStore.setItemAsync(`caloria_model_${provider}`, model);
+export const getSelectedModel = (provider: AIProvider) =>
+  SecureStore.getItemAsync(`caloria_model_${provider}`);
