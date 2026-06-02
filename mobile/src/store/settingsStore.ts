@@ -7,7 +7,7 @@ import {
 
 const DEFAULT_MODELS: Record<AIProvider, string> = {
   openai: 'gpt-4o',
-  gemini: 'gemini-1.5-flash',
+  gemini: 'gemini-flash-latest',
   claude: 'claude-3-haiku-20240307',
   deepseek: 'deepseek-chat',
 };

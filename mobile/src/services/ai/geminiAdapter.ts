@@ -5,7 +5,7 @@ import { parseAIJson } from './types';
 export const analyzeWithGemini = async (
   imageBase64: string,
   apiKey: string,
-  model: string = 'gemini-1.5-flash'
+  model: string = 'gemini-flash-latest'
 ): Promise<AIAnalysisResult> => {
   const body = {
     contents: [
@@ -22,7 +22,7 @@ export const analyzeWithGemini = async (
       },
     ],
     generationConfig: {
-      maxOutputTokens: 1024,
+      maxOutputTokens: 2048,
       temperature: 0.2,
       responseMimeType: 'application/json',
     },
