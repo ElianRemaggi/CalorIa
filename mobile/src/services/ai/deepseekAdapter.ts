@@ -5,7 +5,8 @@ import { parseAIJson } from './types';
 export const analyzeWithDeepSeek = async (
   imageBase64: string,
   apiKey: string,
-  model: string = 'deepseek-chat'
+  model: string = 'deepseek-chat',
+  mimeType: string = 'image/jpeg'
 ): Promise<AIAnalysisResult> => {
   const body = {
     model,
@@ -24,7 +25,7 @@ export const analyzeWithDeepSeek = async (
           },
           {
             type: 'image_url',
-            image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+            image_url: { url: `data:${mimeType};base64,${imageBase64}` },
           },
         ],
       },

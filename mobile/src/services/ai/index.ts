@@ -8,7 +8,8 @@ import { analyzeWithDeepSeek } from './deepseekAdapter';
 
 export const analyzeImage = async (
   imageBase64: string,
-  provider: AIProvider
+  provider: AIProvider,
+  mimeType: string = 'image/jpeg'
 ): Promise<AIAnalysisResult> => {
   const apiKey = await getApiKey(provider);
   if (!apiKey) {
@@ -22,12 +23,12 @@ export const analyzeImage = async (
 
   switch (provider) {
     case 'openai':
-      return analyzeWithOpenAI(imageBase64, apiKey, model);
+      return analyzeWithOpenAI(imageBase64, apiKey, model, mimeType);
     case 'gemini':
-      return analyzeWithGemini(imageBase64, apiKey, model);
+      return analyzeWithGemini(imageBase64, apiKey, model, mimeType);
     case 'claude':
-      return analyzeWithClaude(imageBase64, apiKey, model);
+      return analyzeWithClaude(imageBase64, apiKey, model, mimeType);
     case 'deepseek':
-      return analyzeWithDeepSeek(imageBase64, apiKey, model);
+      return analyzeWithDeepSeek(imageBase64, apiKey, model, mimeType);
   }
 };

@@ -5,7 +5,8 @@ import { parseAIJson } from './types';
 export const analyzeWithGemini = async (
   imageBase64: string,
   apiKey: string,
-  model: string = 'gemini-flash-latest'
+  model: string = 'gemini-flash-latest',
+  mimeType: string = 'image/jpeg'
 ): Promise<AIAnalysisResult> => {
   const body = {
     contents: [
@@ -14,7 +15,7 @@ export const analyzeWithGemini = async (
           { text: AI_PROMPT },
           {
             inline_data: {
-              mime_type: 'image/jpeg',
+              mime_type: mimeType,
               data: imageBase64,
             },
           },
@@ -42,8 +43,18 @@ export const analyzeWithGemini = async (
   }
 
   const json = await response.json();
-  const rawContent: string =
-    json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  // Thinking models return multiple parts; filter out thought parts and join the rest
+  const parts: any[] = json.candidates?.[0]?.content?.parts ?? [];
+  const rawContent: string = parts
+    .filter((p) => !p.thought)
+    .map((p) => p.text ?? '')
+    .join('');
+
+  if (!rawContent) {
+    const finishReason = json.candidates?.[0]?.finishReason ?? 'unknown';
+    throw new Error(`Gemini devolvió respuesta vacía (finishReason: ${finishReason})`);
+  }
+
   const parsed = parseAIJson(rawContent);
 
   return {

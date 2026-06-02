@@ -72,13 +72,14 @@ export default function MealsScreen() {
 
     if (result.canceled || !result.assets[0]) return;
 
-    const uri = result.assets[0].uri;
+    const { uri, mimeType: assetMime } = result.assets[0];
+    const mimeType = assetMime ?? 'image/jpeg';
     setAnalyzingPhoto(true);
     try {
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      const analysis = await analyzeImage(base64, aiProvider);
+      const analysis = await analyzeImage(base64, aiProvider, mimeType);
       setAiResult(analysis);
       // Fire USDA search in background — don't block modal
       setSearchingUsda(true);

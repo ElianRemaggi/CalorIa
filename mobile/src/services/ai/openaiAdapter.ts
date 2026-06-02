@@ -5,7 +5,8 @@ import { parseAIJson } from './types';
 export const analyzeWithOpenAI = async (
   imageBase64: string,
   apiKey: string,
-  model: string = 'gpt-4o'
+  model: string = 'gpt-4o',
+  mimeType: string = 'image/jpeg'
 ): Promise<AIAnalysisResult> => {
   const body = {
     model,
@@ -25,7 +26,7 @@ export const analyzeWithOpenAI = async (
           },
           {
             type: 'image_url',
-            image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+            image_url: { url: `data:${mimeType};base64,${imageBase64}` },
           },
         ],
       },

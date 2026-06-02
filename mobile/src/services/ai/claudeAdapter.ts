@@ -5,7 +5,8 @@ import { parseAIJson } from './types';
 export const analyzeWithClaude = async (
   imageBase64: string,
   apiKey: string,
-  model: string = 'claude-3-haiku-20240307'
+  model: string = 'claude-3-haiku-20240307',
+  mimeType: string = 'image/jpeg'
 ): Promise<AIAnalysisResult> => {
   const body = {
     model,
@@ -19,7 +20,7 @@ export const analyzeWithClaude = async (
             type: 'image',
             source: {
               type: 'base64',
-              media_type: 'image/jpeg',
+              media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
               data: imageBase64,
             },
           },
