@@ -1,9 +1,21 @@
 import { create } from 'zustand';
+import * as SecureStore from 'expo-secure-store';
 import { AIProvider } from '@/types';
 import {
   getAiProvider, saveAiProvider,
   getSelectedModel, saveSelectedModel,
 } from '@/services/secureStorage';
+
+export type MealReminderKey = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+const DEFAULT_REMINDER_TIMES: Record<MealReminderKey, string> = {
+  breakfast: '08:00',
+  lunch: '13:00',
+  dinner: '20:00',
+  snack: '16:00',
+};
+
+const REMINDER_TIMES_KEY = 'caloria_reminder_times';
 
 const DEFAULT_MODELS: Record<AIProvider, string> = {
   openai: 'gpt-4o',
@@ -15,14 +27,17 @@ const DEFAULT_MODELS: Record<AIProvider, string> = {
 interface SettingsStore {
   aiProvider: AIProvider;
   selectedModels: Record<AIProvider, string>;
+  reminderTimes: Record<MealReminderKey, string>;
   setAiProvider: (provider: AIProvider) => Promise<void>;
   setSelectedModel: (provider: AIProvider, model: string) => Promise<void>;
+  setReminderTime: (type: MealReminderKey, time: string) => Promise<void>;
   loadFromStorage: () => Promise<void>;
 }
 
-export const useSettingsStore = create<SettingsStore>((set) => ({
+export const useSettingsStore = create<SettingsStore>((set, get) => ({
   aiProvider: 'openai',
   selectedModels: { ...DEFAULT_MODELS },
+  reminderTimes: { ...DEFAULT_REMINDER_TIMES },
 
   setAiProvider: async (provider) => {
     await saveAiProvider(provider);
@@ -36,6 +51,12 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     }));
   },
 
+  setReminderTime: async (type, time) => {
+    const next = { ...get().reminderTimes, [type]: time };
+    set({ reminderTimes: next });
+    await SecureStore.setItemAsync(REMINDER_TIMES_KEY, JSON.stringify(next));
+  },
+
   loadFromStorage: async () => {
     const stored = await getAiProvider();
     if (stored) set({ aiProvider: stored });
@@ -46,5 +67,10 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
       if (model) models[provider] = model;
     }
     set({ selectedModels: models });
+
+    const timesRaw = await SecureStore.getItemAsync(REMINDER_TIMES_KEY);
+    if (timesRaw) {
+      set({ reminderTimes: { ...DEFAULT_REMINDER_TIMES, ...JSON.parse(timesRaw) } });
+    }
   },
 }));

@@ -34,6 +34,12 @@ const config = {
     "expo-router",
     "expo-secure-store",
     [
+      "expo-camera",
+      {
+        cameraPermission: "CalorIA necesita la cámara para escanear códigos de barras."
+      }
+    ],
+    [
       "expo-image-picker",
       {
         photosPermission: "La app necesita acceso a tus fotos para registrar comidas.",

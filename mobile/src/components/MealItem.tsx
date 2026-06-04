@@ -8,9 +8,11 @@ interface Props {
   meal: MealEntry;
   onDelete: () => void;
   onEdit?: () => void;
+  onFavorite?: () => void;
+  isFavorite?: boolean;
 }
 
-export const MealItem: React.FC<Props> = ({ meal, onDelete, onEdit }) => {
+export const MealItem: React.FC<Props> = ({ meal, onDelete, onEdit, onFavorite, isFavorite }) => {
   const time = format(new Date(meal.mealDatetime), 'HH:mm', { locale: es });
 
   const handleDelete = () => {
@@ -40,6 +42,13 @@ export const MealItem: React.FC<Props> = ({ meal, onDelete, onEdit }) => {
       </View>
 
       <View style={styles.actions}>
+        {onFavorite && (
+          <TouchableOpacity onPress={onFavorite} style={styles.actionBtn}>
+            <Text style={isFavorite ? styles.actionFavActive : styles.actionFav}>
+              {isFavorite ? '★' : '☆'}
+            </Text>
+          </TouchableOpacity>
+        )}
         {onEdit && (
           <TouchableOpacity onPress={onEdit} style={styles.actionBtn}>
             <Text style={styles.actionEdit}>Editar</Text>
@@ -95,4 +104,6 @@ const styles = StyleSheet.create({
   actionBtn: { paddingVertical: 4 },
   actionEdit: { color: '#2196F3', fontSize: 13 },
   actionDelete: { color: '#F44336', fontSize: 13 },
+  actionFav: { color: '#BBB', fontSize: 18 },
+  actionFavActive: { color: '#FFC107', fontSize: 18 },
 });

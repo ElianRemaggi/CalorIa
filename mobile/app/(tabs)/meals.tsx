@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Modal,
   TextInput, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,10 +14,12 @@ import { useMeals, useCreateManualMeal, useCreatePhotoMeal, useDeleteMeal } from
 import { MealItem } from '@/components/MealItem';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ErrorMessage } from '@/components/ErrorMessage';
-import { analyzeImage } from '@/services/ai';
+import { analyzeImage, analyzeText } from '@/services/ai';
 import { useSettingsStore } from '@/store/settingsStore';
-import { AIAnalysisResult, UsdaFoodItem } from '@/types';
+import { useFavoritesStore } from '@/store/favoritesStore';
+import { AIAnalysisResult, UsdaFoodItem, FavoriteMeal } from '@/types';
 import { searchUsda } from '@/api/usda';
+import { lookupBarcode } from '@/api/openFoodFacts';
 import { format } from 'date-fns';
 
 const manualSchema = z.object({
@@ -43,6 +46,19 @@ export default function MealsScreen() {
   const [usdaResults, setUsdaResults] = useState<UsdaFoodItem[]>([]);
   const [selectedUsdaItem, setSelectedUsdaItem] = useState<UsdaFoodItem | null>(null);
   const [searchingUsda, setSearchingUsda] = useState(false);
+  const [pendingPhoto, setPendingPhoto] = useState<{ uri: string; mimeType: string } | null>(null);
+  const [userNote, setUserNote] = useState('');
+  const [showDescribeModal, setShowDescribeModal] = useState(false);
+  const [descriptionText, setDescriptionText] = useState('');
+  const [analyzingText, setAnalyzingText] = useState(false);
+  const [showBarcode, setShowBarcode] = useState(false);
+  const [scanningBarcode, setScanningBarcode] = useState(false);
+  const barcodeCooldown = useRef(false);
+
+  const { favorites, loadFromStorage: loadFavorites, addFavorite, removeFavorite, isFavorite } = useFavoritesStore();
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+
+  useEffect(() => { loadFavorites(); }, []);
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm<ManualForm>({
     resolver: zodResolver(manualSchema),
@@ -73,15 +89,21 @@ export default function MealsScreen() {
     if (result.canceled || !result.assets[0]) return;
 
     const { uri, mimeType: assetMime } = result.assets[0];
-    const mimeType = assetMime ?? 'image/jpeg';
+    setPendingPhoto({ uri, mimeType: assetMime ?? 'image/jpeg' });
+    setUserNote('');
+  };
+
+  const handleAnalyzeWithNote = async () => {
+    if (!pendingPhoto) return;
+    const { uri, mimeType } = pendingPhoto;
+    setPendingPhoto(null);
     setAnalyzingPhoto(true);
     try {
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      const analysis = await analyzeImage(base64, aiProvider, mimeType);
+      const analysis = await analyzeImage(base64, aiProvider, mimeType, userNote || undefined);
       setAiResult(analysis);
-      // Fire USDA search in background — don't block modal
       setSearchingUsda(true);
       searchUsda(analysis.title)
         .then((res) => setUsdaResults(res.foods))
@@ -96,6 +118,107 @@ export default function MealsScreen() {
     } finally {
       setAnalyzingPhoto(false);
     }
+  };
+
+  const handleAnalyzeDescription = async () => {
+    const trimmed = descriptionText.trim();
+    if (!trimmed) return;
+    setShowDescribeModal(false);
+    setAnalyzingText(true);
+    try {
+      const analysis = await analyzeText(trimmed, aiProvider);
+      setAiResult(analysis);
+      setSearchingUsda(true);
+      searchUsda(analysis.title)
+        .then((res) => setUsdaResults(res.foods))
+        .catch(() => setUsdaResults([]))
+        .finally(() => setSearchingUsda(false));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      Alert.alert('Error al analizar', message, [
+        { text: 'Cargar manualmente', onPress: () => setShowManualModal(true) },
+        { text: 'Cancelar', style: 'cancel' },
+      ]);
+    } finally {
+      setAnalyzingText(false);
+      setDescriptionText('');
+    }
+  };
+
+  const handleOpenBarcode = async () => {
+    if (!cameraPermission?.granted) {
+      const { granted } = await requestCameraPermission();
+      if (!granted) {
+        Alert.alert('Permiso requerido', 'Necesitamos acceso a la cámara para escanear.');
+        return;
+      }
+    }
+    barcodeCooldown.current = false;
+    setShowBarcode(true);
+  };
+
+  const handleBarcodeScanned = async ({ data }: { data: string }) => {
+    if (barcodeCooldown.current) return;
+    barcodeCooldown.current = true;
+    setShowBarcode(false);
+    setScanningBarcode(true);
+    try {
+      const result = await lookupBarcode(data);
+      if (!result.found) {
+        Alert.alert('Producto no encontrado', 'No se encontró el código en OpenFoodFacts. Podés cargarlo manualmente.', [
+          { text: 'Cargar manualmente', onPress: () => setShowManualModal(true) },
+          { text: 'Cancelar', style: 'cancel' },
+        ]);
+        return;
+      }
+      const label = result.brand ? `${result.title} (${result.brand})` : result.title;
+      const cal100 = result.calories100g ?? 0;
+      const prot100 = result.protein100g ?? 0;
+      const carb100 = result.carbs100g ?? 0;
+      const fat100 = result.fat100g ?? 0;
+      const hint = result.servingSize ? `Porción sugerida: ${result.servingSize}` : 'Valores por 100g. Ajustá la cantidad.';
+      Alert.alert(label, hint, [
+        {
+          text: 'Agregar (100g)',
+          onPress: async () => {
+            await createManual.mutateAsync({
+              title: label,
+              mealDateTime: new Date().toISOString(),
+              finalCalories: Math.round(cal100),
+              finalProteinG: Math.round(prot100),
+              finalCarbsG: Math.round(carb100),
+              finalFatG: Math.round(fat100),
+            });
+          },
+        },
+        { text: 'Editar antes de guardar', onPress: () => setShowManualModal(true) },
+        { text: 'Cancelar', style: 'cancel' },
+      ]);
+    } catch {
+      Alert.alert('Error', 'No se pudo consultar OpenFoodFacts. Revisá tu conexión.');
+    } finally {
+      setScanningBarcode(false);
+    }
+  };
+
+  const handleToggleFavorite = (meal: FavoriteMeal) => {
+    if (isFavorite(meal.id)) {
+      removeFavorite(meal.id);
+    } else {
+      addFavorite(meal);
+    }
+  };
+
+  const handleQuickAddFavorite = async (fav: FavoriteMeal) => {
+    await createManual.mutateAsync({
+      title: fav.title,
+      description: fav.description,
+      mealDateTime: new Date().toISOString(),
+      finalCalories: fav.finalCalories,
+      finalProteinG: fav.finalProteinG,
+      finalCarbsG: fav.finalCarbsG,
+      finalFatG: fav.finalFatG,
+    });
   };
 
   const handleConfirmAI = async (final: ManualForm) => {
@@ -143,10 +266,27 @@ export default function MealsScreen() {
         <Text style={styles.subtitle}>{format(today, 'dd/MM/yyyy')}</Text>
       </View>
 
-      {analyzingPhoto && (
+      {(analyzingPhoto || analyzingText || scanningBarcode) && (
         <View style={styles.analyzing}>
           <ActivityIndicator color="#4CAF50" />
-          <Text style={styles.analyzingText}>Analizando imagen con IA...</Text>
+          <Text style={styles.analyzingText}>
+            {scanningBarcode ? 'Buscando producto...' : analyzingText ? 'Estimando calorías con IA...' : 'Analizando imagen con IA...'}
+          </Text>
+        </View>
+      )}
+
+      {/* Favorites quick-add strip */}
+      {favorites.length > 0 && (
+        <View style={styles.favSection}>
+          <Text style={styles.favTitle}>Favoritos</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favList}>
+            {favorites.map((fav) => (
+              <TouchableOpacity key={fav.id} style={styles.favCard} onPress={() => handleQuickAddFavorite(fav)}>
+                <Text style={styles.favCardTitle} numberOfLines={2}>{fav.title}</Text>
+                <Text style={styles.favCardCal}>{fav.finalCalories} kcal</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
 
@@ -157,6 +297,17 @@ export default function MealsScreen() {
           <MealItem
             meal={item}
             onDelete={() => deleteMealMutation.mutate(item.id)}
+            isFavorite={isFavorite(item.id)}
+            onFavorite={() => handleToggleFavorite({
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              finalCalories: item.finalCalories,
+              finalProteinG: item.finalProteinG,
+              finalCarbsG: item.finalCarbsG,
+              finalFatG: item.finalFatG,
+              savedAt: new Date().toISOString(),
+            })}
           />
         )}
         contentContainerStyle={styles.list}
@@ -167,11 +318,17 @@ export default function MealsScreen() {
 
       {/* Action buttons */}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowManualModal(true)}>
-          <Text style={styles.btnSecondaryText}>+ Manual</Text>
+        <TouchableOpacity style={[styles.btnPrimary, { flex: 1 }]} onPress={handlePickPhoto}>
+          <Text style={styles.btnPrimaryText}>Foto</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnPrimary} onPress={handlePickPhoto}>
-          <Text style={styles.btnPrimaryText}>Por foto</Text>
+        <TouchableOpacity style={[styles.btnSecondary, { flex: 1 }]} onPress={handleOpenBarcode}>
+          <Text style={styles.btnSecondaryText}>Barcode</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.btnSecondary, { flex: 1 }]} onPress={() => { setDescriptionText(''); setShowDescribeModal(true); }}>
+          <Text style={styles.btnSecondaryText}>Describir</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnSecondary} onPress={() => setShowManualModal(true)}>
+          <Text style={styles.btnSecondaryText}>Manual</Text>
         </TouchableOpacity>
       </View>
 
@@ -203,6 +360,103 @@ export default function MealsScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Photo note modal */}
+      <Modal visible={!!pendingPhoto} animationType="slide" presentationStyle="pageSheet" transparent>
+        <KeyboardAvoidingView
+          style={styles.noteOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.noteSheet}>
+            <Text style={styles.noteTitle}>Agregar contexto (opcional)</Text>
+            <Text style={styles.noteHint}>
+              Describí el plato con más detalle: relleno, ingredientes no visibles, tamaño de porción, etc.
+            </Text>
+            <TextInput
+              style={[styles.input, styles.noteInput]}
+              value={userNote}
+              onChangeText={setUserNote}
+              placeholder="Ej: empanadas de carne con aceitunas y huevo duro, 3 unidades"
+              placeholderTextColor="#AAA"
+              multiline
+              numberOfLines={3}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.btnCancel}
+                onPress={() => { setPendingPhoto(null); setUserNote(''); }}
+              >
+                <Text style={styles.btnCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnPrimary, { flex: 1 }]}
+                onPress={handleAnalyzeWithNote}
+              >
+                <Text style={styles.btnPrimaryText}>Analizar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Describe meal modal */}
+      <Modal visible={showDescribeModal} animationType="slide" presentationStyle="pageSheet" transparent>
+        <KeyboardAvoidingView
+          style={styles.noteOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.noteSheet}>
+            <Text style={styles.noteTitle}>Describir comida</Text>
+            <Text style={styles.noteHint}>
+              Describí lo que comiste y la IA estimará las calorías y macros. Incluí cantidades y preparación para mayor precisión.
+            </Text>
+            <TextInput
+              style={[styles.input, styles.noteInput]}
+              value={descriptionText}
+              onChangeText={setDescriptionText}
+              placeholder="Ej: 2 milanesas de pollo con puré de papas, vaso de jugo de naranja"
+              placeholderTextColor="#AAA"
+              multiline
+              numberOfLines={4}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.btnCancel}
+                onPress={() => { setShowDescribeModal(false); setDescriptionText(''); }}
+              >
+                <Text style={styles.btnCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnPrimary, { flex: 1, opacity: descriptionText.trim() ? 1 : 0.5 }]}
+                onPress={handleAnalyzeDescription}
+                disabled={!descriptionText.trim()}
+              >
+                <Text style={styles.btnPrimaryText}>Estimar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Barcode scanner modal */}
+      <Modal visible={showBarcode} animationType="slide" onRequestClose={() => setShowBarcode(false)}>
+        <View style={styles.barcodeContainer}>
+          <CameraView
+            style={StyleSheet.absoluteFillObject}
+            barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr'] }}
+            onBarcodeScanned={handleBarcodeScanned}
+          />
+          <View style={styles.barcodeOverlay}>
+            <View style={styles.barcodeFrame} />
+            <Text style={styles.barcodeHint}>Apuntá al código de barras del producto</Text>
+          </View>
+          <TouchableOpacity style={styles.barcodeClose} onPress={() => setShowBarcode(false)}>
+            <Text style={styles.barcodeCloseText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* AI result edit modal */}
@@ -446,4 +700,57 @@ const styles = StyleSheet.create({
   usdaItemMacros: { fontSize: 12, color: '#666', marginTop: 2 },
   usdaItemBadge: { fontSize: 11, color: '#4CAF50', fontWeight: '700', marginTop: 4 },
   usdaReset: { fontSize: 12, color: '#F57C00', textAlign: 'center', marginTop: 4, textDecorationLine: 'underline' },
+  noteOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  noteSheet: {
+    backgroundColor: '#F5F5F5',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 36,
+  },
+  noteTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: 8 },
+  noteHint: { fontSize: 13, color: '#666', marginBottom: 16 },
+  noteInput: { minHeight: 80, textAlignVertical: 'top' },
+  // Favorites
+  favSection: { paddingHorizontal: 16, paddingBottom: 4 },
+  favTitle: { fontSize: 13, fontWeight: '700', color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  favList: { gap: 10, paddingBottom: 4 },
+  favCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 12,
+    width: 120,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  favCardTitle: { fontSize: 12, fontWeight: '600', color: '#1A1A1A', marginBottom: 4 },
+  favCardCal: { fontSize: 13, fontWeight: '700', color: '#4CAF50' },
+  // Barcode scanner
+  barcodeContainer: { flex: 1, backgroundColor: '#000' },
+  barcodeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barcodeFrame: {
+    width: 260,
+    height: 160,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    backgroundColor: 'transparent',
+  },
+  barcodeHint: { color: '#FFF', marginTop: 20, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
+  barcodeClose: {
+    position: 'absolute',
+    bottom: 48,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 30,
+  },
+  barcodeCloseText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
 });

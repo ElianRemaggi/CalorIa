@@ -124,6 +124,17 @@ export interface NotificationPreferences {
 
 export type AIProvider = 'openai' | 'gemini' | 'claude' | 'deepseek';
 
+export interface FavoriteMeal {
+  id: string;
+  title: string;
+  description?: string;
+  finalCalories: number;
+  finalProteinG: number;
+  finalCarbsG: number;
+  finalFatG: number;
+  savedAt: string;
+}
+
 export interface DailySummary {
   date: string;
   totalCalories: number;

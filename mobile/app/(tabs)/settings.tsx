@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, FlatList,
   TextInput, Switch, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,11 +8,23 @@ import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getNotificationSettings, updateNotificationSettings } from '@/api/notifications';
 import { useAuthStore } from '@/store/authStore';
-import { useSettingsStore } from '@/store/settingsStore';
+import { useSettingsStore, MealReminderKey } from '@/store/settingsStore';
 import { getApiKey, saveApiKey } from '@/services/secureStorage';
 import { fetchModels, ModelOption } from '@/services/ai/modelFetcher';
 import { AIProvider, NotificationPreferences } from '@/types';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import {
+  requestNotificationPermissions,
+  scheduleReminder,
+  cancelReminder,
+  parseTime,
+} from '@/services/notifications';
+
+const REMINDER_TIMES: string[] = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? '00' : '30';
+  return `${String(h).padStart(2, '0')}:${m}`;
+});
 
 const AI_PROVIDERS: { value: AIProvider; label: string }[] = [
   { value: 'openai', label: 'OpenAI (GPT-4o)' },
@@ -25,8 +37,9 @@ export default function SettingsScreen() {
   const router = useRouter();
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const user = useAuthStore((s) => s.user);
-  const { aiProvider, setAiProvider, selectedModels, setSelectedModel } = useSettingsStore();
+  const { aiProvider, setAiProvider, selectedModels, setSelectedModel, reminderTimes, setReminderTime } = useSettingsStore();
   const queryClient = useQueryClient();
+  const [timePicker, setTimePicker] = useState<MealReminderKey | null>(null);
 
   const [apiKeys, setApiKeys] = useState<Record<AIProvider, string>>({
     openai: '', gemini: '', claude: '', deepseek: '',
@@ -101,9 +114,39 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const toggleNotif = (key: keyof NotificationPreferences, value: boolean | number) => {
+  const toggleNotif = async (key: keyof NotificationPreferences, value: boolean | number) => {
     if (!notifSettings) return;
     updateNotif.mutate({ ...notifSettings, [key]: value });
+
+    const reminderMap: Partial<Record<keyof NotificationPreferences, MealReminderKey>> = {
+      breakfastReminderEnabled: 'breakfast',
+      lunchReminderEnabled: 'lunch',
+      dinnerReminderEnabled: 'dinner',
+      snackReminderEnabled: 'snack',
+    };
+    const mealType = reminderMap[key];
+    if (!mealType) return;
+
+    if (value === true) {
+      const granted = await requestNotificationPermissions();
+      if (!granted) {
+        Alert.alert('Permiso requerido', 'Habilitá las notificaciones en los ajustes del sistema.');
+        return;
+      }
+      const { hour, minute } = parseTime(reminderTimes[mealType]);
+      await scheduleReminder(mealType, hour, minute);
+    } else {
+      await cancelReminder(mealType as any);
+    }
+  };
+
+  const handleTimeChange = async (mealType: MealReminderKey, time: string) => {
+    await setReminderTime(mealType, time);
+    setTimePicker(null);
+    if (notifSettings?.[`${mealType}ReminderEnabled` as keyof NotificationPreferences]) {
+      const { hour, minute } = parseTime(time);
+      await scheduleReminder(mealType, hour, minute);
+    }
   };
 
   return (
@@ -221,26 +264,27 @@ export default function SettingsScreen() {
             value={notifSettings?.enabled ?? false}
             onToggle={(v) => toggleNotif('enabled', v)}
           />
-          <NotifToggle
-            label="Recordatorio desayuno"
-            value={notifSettings?.breakfastReminderEnabled ?? false}
-            onToggle={(v) => toggleNotif('breakfastReminderEnabled', v)}
-          />
-          <NotifToggle
-            label="Recordatorio almuerzo"
-            value={notifSettings?.lunchReminderEnabled ?? false}
-            onToggle={(v) => toggleNotif('lunchReminderEnabled', v)}
-          />
-          <NotifToggle
-            label="Recordatorio cena"
-            value={notifSettings?.dinnerReminderEnabled ?? false}
-            onToggle={(v) => toggleNotif('dinnerReminderEnabled', v)}
-          />
-          <NotifToggle
-            label="Recordatorio merienda"
-            value={notifSettings?.snackReminderEnabled ?? false}
-            onToggle={(v) => toggleNotif('snackReminderEnabled', v)}
-          />
+          {(
+            [
+              { key: 'breakfastReminderEnabled', label: 'Desayuno', type: 'breakfast' },
+              { key: 'lunchReminderEnabled', label: 'Almuerzo', type: 'lunch' },
+              { key: 'dinnerReminderEnabled', label: 'Cena', type: 'dinner' },
+              { key: 'snackReminderEnabled', label: 'Merienda', type: 'snack' },
+            ] as { key: keyof NotificationPreferences; label: string; type: MealReminderKey }[]
+          ).map(({ key, label, type }) => (
+            <View key={key} style={styles.notifRow}>
+              <NotifToggle
+                label={label}
+                value={(notifSettings?.[key] as boolean) ?? false}
+                onToggle={(v) => toggleNotif(key, v)}
+              />
+              {(notifSettings?.[key] as boolean) && (
+                <TouchableOpacity style={styles.timeChip} onPress={() => setTimePicker(type)}>
+                  <Text style={styles.timeChipText}>{reminderTimes[type]}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
         </Section>
 
         {/* Logout */}
@@ -250,6 +294,33 @@ export default function SettingsScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Time picker modal */}
+      <Modal visible={!!timePicker} transparent animationType="slide" onRequestClose={() => setTimePicker(null)}>
+        <View style={styles.timeOverlay}>
+          <View style={styles.timeSheet}>
+            <Text style={styles.timeSheetTitle}>Hora del recordatorio</Text>
+            <FlatList
+              data={REMINDER_TIMES}
+              keyExtractor={(t) => t}
+              style={{ maxHeight: 320 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.timeOption, timePicker && reminderTimes[timePicker] === item && styles.timeOptionSelected]}
+                  onPress={() => timePicker && handleTimeChange(timePicker, item)}
+                >
+                  <Text style={[styles.timeOptionText, timePicker && reminderTimes[timePicker] === item && styles.timeOptionTextSelected]}>
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity style={styles.timeCancelBtn} onPress={() => setTimePicker(null)}>
+              <Text style={styles.timeCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -312,4 +383,16 @@ const styles = StyleSheet.create({
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
   navLabel: { fontSize: 15, color: '#333' },
   navArrow: { fontSize: 20, color: '#CCC', fontWeight: '300' },
+  notifRow: {},
+  timeChip: { marginHorizontal: 16, marginBottom: 10, alignSelf: 'flex-start', backgroundColor: '#E8F5E9', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4 },
+  timeChipText: { color: '#2E7D32', fontWeight: '700', fontSize: 13 },
+  timeOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  timeSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 40 },
+  timeSheetTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A', marginBottom: 16, textAlign: 'center' },
+  timeOption: { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 8, marginBottom: 4 },
+  timeOptionSelected: { backgroundColor: '#E8F5E9' },
+  timeOptionText: { fontSize: 16, color: '#333', textAlign: 'center' },
+  timeOptionTextSelected: { color: '#2E7D32', fontWeight: '700' },
+  timeCancelBtn: { marginTop: 12, paddingVertical: 14, alignItems: 'center' },
+  timeCancelText: { color: '#888', fontSize: 15 },
 });
