@@ -10,7 +10,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: caloria-backend
-    restart: unless-stopped
+    restart: on-failure:3
     # Only accessible from localhost — nginx handles TLS + public traffic
     ports:
       - "127.0.0.1:8081:8080"
