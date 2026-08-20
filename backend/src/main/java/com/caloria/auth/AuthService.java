@@ -83,7 +83,7 @@ public class AuthService {
         String clientId = appConfig.clientId();
 
         // In dev mode with placeholder client ID, do a lenient parse
-        if (clientId.equals("your-google-client-id.apps.googleusercontent.com")) {
+        if (clientId.equals(AppConfig.PLACEHOLDER_CLIENT_ID)) {
             log.warn("Using dev mode: skipping Google token verification. Set GOOGLE_CLIENT_ID in production.");
             return parseTokenLeniently(idToken);
         }

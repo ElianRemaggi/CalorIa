@@ -21,7 +21,7 @@ const DEFAULT_MODELS: Record<AIProvider, string> = {
   openai: 'gpt-4o',
   gemini: 'gemini-flash-latest',
   claude: 'claude-3-haiku-20240307',
-  deepseek: 'deepseek-chat',
+  deepseek: 'deepseek-v4-flash',
 };
 
 interface SettingsStore {

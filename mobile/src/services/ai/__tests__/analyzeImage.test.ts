@@ -49,7 +49,9 @@ describe('analyzeImage', () => {
 
     const result = await analyzeImage('base64img', 'openai');
 
-    expect(analyzeWithOpenAI).toHaveBeenCalledWith('base64img', 'sk-openai-key');
+    expect(analyzeWithOpenAI).toHaveBeenCalledWith(
+      'base64img', 'sk-openai-key', 'gpt-4o', 'image/jpeg', undefined
+    );
     expect(analyzeWithGemini).not.toHaveBeenCalled();
     expect(analyzeWithClaude).not.toHaveBeenCalled();
     expect(result).toEqual(mockResult);
@@ -61,7 +63,9 @@ describe('analyzeImage', () => {
 
     await analyzeImage('base64img', 'gemini');
 
-    expect(analyzeWithGemini).toHaveBeenCalledWith('base64img', 'gemini-key');
+    expect(analyzeWithGemini).toHaveBeenCalledWith(
+      'base64img', 'gemini-key', 'gemini-flash-latest', 'image/jpeg', undefined
+    );
     expect(analyzeWithOpenAI).not.toHaveBeenCalled();
   });
 
@@ -71,7 +75,9 @@ describe('analyzeImage', () => {
 
     await analyzeImage('base64img', 'claude');
 
-    expect(analyzeWithClaude).toHaveBeenCalledWith('base64img', 'claude-key');
+    expect(analyzeWithClaude).toHaveBeenCalledWith(
+      'base64img', 'claude-key', 'claude-3-haiku-20240307', 'image/jpeg', undefined
+    );
     expect(analyzeWithOpenAI).not.toHaveBeenCalled();
   });
 
